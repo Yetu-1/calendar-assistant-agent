@@ -65,6 +65,14 @@ def patch_event(event_id: str, start: EventDateTime, end: EventDateTime) -> str:
     ).execute()
     return f"Result: {result}"
 
+def delete_event(event_id: str) -> str:
+    client = CalendarClient();
+    result = client.service.events().delete(
+            calendarId=Settings.CALENDAR_ID,
+            eventId=event_id,
+    ).execute()
+    return f"Result: {result}"
+
 
 get_datetime_tool = FunctionTool(get_date_and_time, description="Use this tool to fetch current date and time.")
 add_event_to_calendar_tool = FunctionTool(
@@ -72,3 +80,12 @@ add_event_to_calendar_tool = FunctionTool(
 )
 fetch_events_tool = FunctionTool(fetch_events, description="Use this tool to fetch events from the calendar.")
 reschedule_event_tool = FunctionTool(patch_event, description="Use the tool to reschedule and update event in the calendar.")
+delete_event_tool = FunctionTool(delete_event, description="Use this to to delete events in the calendar")
+
+calendar_agent_tools: List[Tool] = [
+    get_datetime_tool,
+    add_event_to_calendar_tool,
+    fetch_events_tool,
+    reschedule_event_tool,
+    delete_event_tool
+]
