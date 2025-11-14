@@ -1,4 +1,10 @@
 from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
+from autogen_core import AgentId, SingleThreadedAgentRuntime
+from src.tools.messages import Message
+
+# Create a runtime.
+runtime = SingleThreadedAgentRuntime()
+calendar_assistant_agent = AgentId("calendar_assistant_agent", "default") # define calendar agent ID
 
 # Websockets connection manager
 class ConnectionManager:
@@ -28,9 +34,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await manager.connect(websocket)
     try:
         while True:
-            # TODO: Receive message from websocket
-            message = await websocket.receive_text()
-            # TODO: Send the message to the calendar assistant agent.
+            # Receive message from websocket
+            message =  Message(client_id=client_id, content=await websocket.receive_text())
+            # Send the message to the calendar assistant agent
+            response = await runtime.send_message(message, calendar_assistant_agent)
+            await manager.send_message(f"Assistant: {response.content}", websocket)
     except WebSocketDisconnect:
         # Disconnect websocket
         manager.disconnect(websocket)
