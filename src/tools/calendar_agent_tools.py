@@ -38,7 +38,23 @@ def add_event_to_calendar(event: CalendarEvent) -> str:
     ).execute()
     return f"Result: {result}"
 
+def fetch_events(time_min: EventDateTime, time_max: EventDateTime) -> str:
+    client = CalendarClient();
+    events_list = client.service.events().list(
+            calendarId=Settings.CALENDAR_ID,
+            timeMin=time_min.dateTime,
+            timeMax=time_max.dateTime,
+            timeZone=time_min.timeZone,
+            singleEvents=True,
+            orderBy="startTime"
+    ).execute()
+    if not events_list:
+        return "No events found in this time range."
+    events = events_list.get("items", [])
+    return f"Events:\n {events}"
+
 get_datetime_tool = FunctionTool(get_date_and_time, description="Use this tool to fetch current date and time.")
 add_event_to_calendar_tool = FunctionTool(
     add_event_to_calendar, description="Use to add event to calendar."
 )
+fetch_events_tool = FunctionTool(fetch_events, description="Use this tool to fetch events from the calendar.")
