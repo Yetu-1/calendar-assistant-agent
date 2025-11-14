@@ -31,4 +31,14 @@ def get_date_and_time() -> str:
         f"Today's day of the week: {date_and_time.strftime('%A')}"
     )
 
+def add_event_to_calendar(event: CalendarEvent) -> str:
+    client = CalendarClient();
+    result = client.service.events().insert(
+        calendarId=Settings.CALENDAR_ID, body=event.model_dump()  # Converts Pydantic model to dict
+    ).execute()
+    return f"Result: {result}"
+
 get_datetime_tool = FunctionTool(get_date_and_time, description="Use this tool to fetch current date and time.")
+add_event_to_calendar_tool = FunctionTool(
+    add_event_to_calendar, description="Use to add event to calendar."
+)
