@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from src.routes import router
+from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -9,3 +10,4 @@ async def lifespan(app: FastAPI):
     # TODO: Stop the runtime (Stop processing messages).
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(router)

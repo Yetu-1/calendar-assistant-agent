@@ -28,8 +28,9 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await manager.connect(websocket)
     try:
         while True:
-            # TODO: receive message from websocket
-
+            # TODO: Receive message from websocket
+            message = await websocket.receive_text()
             # TODO: Send the message to the calendar assistant agent.
     except WebSocketDisconnect:
-        # TODO: disconnect websocket
+        # Disconnect websocket
+        manager.disconnect(websocket)
