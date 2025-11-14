@@ -21,3 +21,14 @@ class CalendarClient:
                 scopes=["https://www.googleapis.com/auth/calendar"]
             )
         )
+
+def get_date_and_time() -> str:
+    time_zone = tzlocal.get_localzone() # Detect system timezone
+    date_and_time = datetime.now(time_zone) 
+    return (
+        f"Today's date and time: {date_and_time}.\n"
+        f"TIME ZONE: {time_zone}.\n"
+        f"Today's day of the week: {date_and_time.strftime('%A')}"
+    )
+
+get_datetime_tool = FunctionTool(get_date_and_time, description="Use this tool to fetch current date and time.")
