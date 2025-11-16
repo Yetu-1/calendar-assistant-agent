@@ -31,6 +31,7 @@ class CalendarAssistantAgent(RoutedAgent):
                 "- Delete google calendar events\n"
                 "- Fetch google calendar events and show the user\n"
                 "- Reshecdule google calendar events\n"
+                "- Get most recent attendee"
                 "--- Follow the Instructions below when interacting with the user:\n"
                 "1. Always get the current date, time and timezone using the appropriate tool.\n"
                 "2. If the user asks about their schedule, availability, or existing events for a date, call the appropriate tool with the timeMin and timeMax values (in ISO 8601 format)."
@@ -52,7 +53,8 @@ class CalendarAssistantAgent(RoutedAgent):
         if message.client_id not in sessions:
             sessions[message.client_id] = []
             sessions[message.client_id].append(self._system_messages[0]) # Append the system message
-
+        
+        # Add the user's message to the session.
         sessions[message.client_id].append(UserMessage(content=message.content, source="user"))
 
         while True:
@@ -63,32 +65,32 @@ class CalendarAssistantAgent(RoutedAgent):
                 cancellation_token=ctx.cancellation_token,
             )
 
-            # Add the first model create result to the session.
+            # Add the llm's result to the session.
             sessions[message.client_id].append(AssistantMessage(content=llm_result.content, source="assistant"))
 
             print(f"{'-'*80}\n{self.id.type}:\n{llm_result.content}", flush=True)
             # If there are no tool calls, return the result.
             if isinstance(llm_result.content, str):
                 return Message(content=llm_result.content)
-            assert isinstance(llm_result.content, list) and all(
-                isinstance(call, FunctionCall) for call in llm_result.content
-            )
 
             # Execute the tool calls.
-            tool_call_results = await asyncio.gather(
-                *[self._execute_tool_call(call, ctx.cancellation_token) for call in llm_result.content]
-            )
-            print(f"{'-'*80}\n{self.id.type}:\n{tool_call_results}", flush=True)
+            try:
+                # Execute the tool calls.
+                tool_call_results = await asyncio.gather(
+                    *[self._execute_tool_call(call, ctx.cancellation_token) for call in llm_result.content]
+                )
+                print(f"{'-'*80}\n{self.id.type}:\n{tool_call_results}", flush=True)
 
-            # Add the function execution results to the session.
-            sessions[message.client_id].append(FunctionExecutionResultMessage(content=tool_call_results))    
+                # Add the function execution results to the session.
+                sessions[message.client_id].append(FunctionExecutionResultMessage(content=tool_call_results)) 
+            except Exception as e:
+                return Message(content=str(e))   
 
     async def _execute_tool_call(
         self, call: FunctionCall, cancellation_token: CancellationToken
     ) -> FunctionExecutionResult:
         # Find the tool by name.
         tool = next((tool for tool in self._tools if tool.name == call.name), None)
-        assert tool is not None
 
         # Run the tool and capture the result.
         try:
