@@ -3,7 +3,7 @@ from src.tools.messages import CalendarEvent, EventDateTime
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 from autogen_core.tools import Tool
-from src.config import Settings
+from src.config import settings
 from datetime import datetime
 from pathlib import Path
 from typing import List
@@ -34,14 +34,14 @@ def get_date_and_time() -> str:
 def add_event_to_calendar(event: CalendarEvent) -> str:
     client = CalendarClient();
     result = client.service.events().insert(
-        calendarId=Settings.CALENDAR_ID, body=event.model_dump()  # Converts Pydantic model to dict
+        calendarId=settings.calendar_id, body=event.model_dump()  # Converts Pydantic model to dict
     ).execute()
     return f"Result: {result}"
 
 def fetch_events(time_min: EventDateTime, time_max: EventDateTime) -> str:
     client = CalendarClient();
     events_list = client.service.events().list(
-            calendarId=Settings.CALENDAR_ID,
+            calendarId=settings.calendar_id,
             timeMin=time_min.dateTime,
             timeMax=time_max.dateTime,
             timeZone=time_min.timeZone,
@@ -56,7 +56,7 @@ def fetch_events(time_min: EventDateTime, time_max: EventDateTime) -> str:
 def patch_event(event_id: str, start: EventDateTime, end: EventDateTime) -> str:
     client = CalendarClient();
     result = client.service.events().patch(
-            calendarId=Settings.CALENDAR_ID,
+            calendarId=settings.calendar_id,
             eventId=event_id,
             body={
                 "start": start.model_dump(),  # Converts Pydantic model to dict
@@ -68,7 +68,7 @@ def patch_event(event_id: str, start: EventDateTime, end: EventDateTime) -> str:
 def delete_event(event_id: str) -> str:
     client = CalendarClient();
     result = client.service.events().delete(
-            calendarId=Settings.CALENDAR_ID,
+            calendarId=settings.calendar_id,
             eventId=event_id,
     ).execute()
     return f"Result: {result}"
