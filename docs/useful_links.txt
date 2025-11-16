@@ -6,6 +6,3 @@ Useful links
 - Access >=1 Google Calendar via the API with service account credentials
     https://discuss.google.dev/t/access-1-google-calendar-via-the-api-with-service-account-credentials/140528
 
-
-add_event(), list_events(), reschedule_event(), check_free_slots()
-
