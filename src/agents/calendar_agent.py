@@ -31,7 +31,6 @@ class CalendarAssistantAgent(RoutedAgent):
                 "- Delete google calendar events\n"
                 "- Fetch google calendar events and show the user\n"
                 "- Reshecdule google calendar events\n"
-                "- Get most recent attendee"
                 "--- Follow the Instructions below when interacting with the user:\n"
                 "1. Always get the current date, time and timezone using the appropriate tool.\n"
                 "2. If the user asks about their schedule, availability, or existing events for a date, call the appropriate tool with the timeMin and timeMax values (in ISO 8601 format)."
