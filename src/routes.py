@@ -1,9 +1,11 @@
 from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
 from autogen_core import AgentId, SingleThreadedAgentRuntime
 from src.tools.messages import Message
+from src.runtime import RuntimeManager
 
 # Create a runtime.
-runtime = SingleThreadedAgentRuntime()
+runtime = RuntimeManager();
+
 calendar_assistant_agent = AgentId("calendar_assistant_agent", "default") # define calendar agent ID
 
 # Websockets connection manager

@@ -4,6 +4,9 @@ from contextlib import asynccontextmanager
 from src.config import Settings
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from src.agents.calendar_agent import CalendarAssistantAgent
+from src.runtime import RuntimeManager
+
+runtime = RuntimeManager()
 
 # Create the model client.
 model_client = OpenAIChatCompletionClient(
@@ -15,7 +18,7 @@ model_client = OpenAIChatCompletionClient(
 async def lifespan(app: FastAPI):
     # Register the calendar assistant agent
     await CalendarAssistantAgent.register(
-        runtime,
+        runtime._runtime,
         "calendar_assistant_agent",
         lambda: CalendarAssistantAgent(
             model_client=model_client,
