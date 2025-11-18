@@ -1,6 +1,10 @@
-from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect, Depends
 from autogen_core import AgentId, SingleThreadedAgentRuntime
 from src.tools.messages import Message
+from src.database.db import get_session, get_user
+from src.database.models import User
+from sqlmodel import Session
+import uuid
 
 # Create a runtime.
 runtime = SingleThreadedAgentRuntime()
@@ -29,16 +33,28 @@ router = APIRouter()
 async def root():
     return {"message": "Server Running"}
 
-@router.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str):
+@router.websocket("/ws/{user_id}")
+async def websocket_endpoint(
+    websocket: WebSocket,
+    user_id: str,
+    session: Session = Depends(get_session)
+):
+    # Fetch User data from database
+    user = get_user(user_id, session)
+    print(f"user: {user}")
+    
+    # Create new conversation id
+    conversation_id = uuid.uuid4();
+
     await manager.connect(websocket)
     try:
         while True:
             # Receive message from websocket
-            message =  Message(client_id=client_id, content=await websocket.receive_text())
+            message =  Message(user_id=user.id, conversation_id=conversation_id, content=await websocket.receive_text())
             # Send the message to the calendar assistant agent
             response = await runtime.send_message(message, calendar_assistant_agent)
             await manager.send_message(f"Assistant: {response.content}", websocket)
     except WebSocketDisconnect:
+        # TODO: Delete conversation from database
         # Disconnect websocket
         manager.disconnect(websocket)
