@@ -18,7 +18,9 @@ from autogen_core.models import (
     FunctionExecutionResultMessage,
 )
 from autogen_core.tools import Tool
-from src.tools.messages import Message
+from src.tools.messages import CustomMessage
+from sqlmodel import Session
+from src.database.db import DatabaseManager
 
 sessions: Dict[str, List[LLMMessage]] = {}
 
@@ -47,41 +49,49 @@ class CalendarAssistantAgent(RoutedAgent):
         self._tools = tool_schema
 
     @message_handler
-    async def handle_user_message(self, message: Message, ctx: MessageContext) -> Message:
-        # Create a session of messages.
-        if message.user_id not in sessions:
-            sessions[message.user_id] = []
-            sessions[message.user_id].append(self._system_messages[0]) # Append the system message
+    async def handle_user_message(self, message: CustomMessage, ctx: MessageContext) -> CustomMessage:
+        database = DatabaseManager()
+        with Session(database._engine) as session:
+            print(f"Conversation id: {message.conversation_id}")
+            # Store conversation data and system message in database if they do not already exist
+            conversation = database.start_conversation(message, self._system_messages[0], session)
 
-        sessions[message.user_id].append(UserMessage(content=message.content, source="user"))
+            # Save system message into database
 
-        while True:
-            # Run the chat completion with the tools.
-            llm_result = await self._model_client.create(
-                messages=sessions[message.user_id],
-                tools=self._tools,
-                cancellation_token=ctx.cancellation_token,
-            )
+            # Create a session of messages.
+            if message.user_id not in sessions:
+                sessions[message.user_id] = []
+                sessions[message.user_id].append(self._system_messages[0]) # Append the system message
 
-            # Add the first model create result to the session.
-            sessions[message.user_id].append(AssistantMessage(content=llm_result.content, source="assistant"))
+            sessions[message.user_id].append(UserMessage(content=message.content, source="user"))
 
-            print(f"{'-'*80}\n{self.id.type}:\n{llm_result.content}", flush=True)
-            # If there are no tool calls, return the result.
-            if isinstance(llm_result.content, str):
-                return Message(content=llm_result.content)
-            assert isinstance(llm_result.content, list) and all(
-                isinstance(call, FunctionCall) for call in llm_result.content
-            )
+            while True:
+                # Run the chat completion with the tools.
+                llm_result = await self._model_client.create(
+                    messages=sessions[message.user_id],
+                    tools=self._tools,
+                    cancellation_token=ctx.cancellation_token,
+                )
 
-            # Execute the tool calls.
-            tool_call_results = await asyncio.gather(
-                *[self._execute_tool_call(call, ctx.cancellation_token) for call in llm_result.content]
-            )
-            print(f"{'-'*80}\n{self.id.type}:\n{tool_call_results}", flush=True)
+                # Add the first model create result to the session.
+                sessions[message.user_id].append(AssistantMessage(content=llm_result.content, source="assistant"))
 
-            # Add the function execution results to the session.
-            sessions[message.user_id].append(FunctionExecutionResultMessage(content=tool_call_results))    
+                print(f"{'-'*80}\n{self.id.type}:\n{llm_result.content}", flush=True)
+                # If there are no tool calls, return the result.
+                if isinstance(llm_result.content, str):
+                    return CustomMessage(content=llm_result.content)
+                assert isinstance(llm_result.content, list) and all(
+                    isinstance(call, FunctionCall) for call in llm_result.content
+                )
+
+                # Execute the tool calls.
+                tool_call_results = await asyncio.gather(
+                    *[self._execute_tool_call(call, ctx.cancellation_token) for call in llm_result.content]
+                )
+                print(f"{'-'*80}\n{self.id.type}:\n{tool_call_results}", flush=True)
+
+                # Add the function execution results to the session.
+                sessions[message.user_id].append(FunctionExecutionResultMessage(content=tool_call_results))    
 
     async def _execute_tool_call(
         self, call: FunctionCall, cancellation_token: CancellationToken

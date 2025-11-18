@@ -1,7 +1,7 @@
 from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect, Depends
 from autogen_core import AgentId, SingleThreadedAgentRuntime
-from src.tools.messages import Message
-from src.database.db import get_session, get_user
+from src.tools.messages import CustomMessage
+from src.database.db import DatabaseManager
 from src.database.models import User
 from sqlmodel import Session
 import uuid
@@ -34,13 +34,10 @@ async def root():
     return {"message": "Server Running"}
 
 @router.websocket("/ws/{user_id}")
-async def websocket_endpoint(
-    websocket: WebSocket,
-    user_id: str,
-    session: Session = Depends(get_session)
-):
+async def websocket_endpoint( websocket: WebSocket, user_id: str):
+    database = DatabaseManager()
     # Fetch User data from database
-    user = get_user(user_id, session)
+    user = database.get_user(user_id)
     print(f"user: {user}")
     
     # Create new conversation id
@@ -50,7 +47,7 @@ async def websocket_endpoint(
     try:
         while True:
             # Receive message from websocket
-            message =  Message(user_id=user.id, conversation_id=conversation_id, content=await websocket.receive_text())
+            message =  CustomMessage(user_id=user.id, conversation_id=conversation_id, content=await websocket.receive_text())
             # Send the message to the calendar assistant agent
             response = await runtime.send_message(message, calendar_assistant_agent)
             await manager.send_message(f"Assistant: {response.content}", websocket)
