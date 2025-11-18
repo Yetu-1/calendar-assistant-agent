@@ -1,15 +1,16 @@
 from sqlmodel import create_engine, SQLModel, Session, select
 from src.database.models import User, Conversation, Message
 from src.tools.messages import CustomMessage
-from autogen_core.models import SystemMessage
+from autogen_core.models import (
+    LLMMessage,
+    SystemMessage,
+    UserMessage,
+    AssistantMessage,
+    FunctionExecutionResultMessage,
+)
 from uuid import UUID
 
 DATABASE_URL = "sqlite:///db.sqlite"
-
-
-def init_db():
-    SQLModel.metadata.create_all(engine)
-
 
 class DatabaseManagerMeta(type):
     _instances = {}
@@ -28,6 +29,12 @@ class DatabaseManager(metaclass=DatabaseManagerMeta):
     def __init__(self) -> None:
         self._engine = create_engine(DATABASE_URL, echo=True)
 
+    # def init_db(self, session: Session):
+    #     SQLModel.metadata.create_all(self._engine)
+    #     user = User(id=UUID('75794adebb7649c8b3b297a2a4a24362'), username='David', email='davidsalihu19@gmail.com')
+    #     session.add(user)
+    #     session.commit()
+
     def get_user(self, user_id: str) -> User:
         # Fetch User data from database
         with Session(self._engine) as session:
@@ -43,7 +50,7 @@ class DatabaseManager(metaclass=DatabaseManagerMeta):
         conversation = results.first()
         return conversation
 
-    def start_conversation(self, message: CustomMessage, system_message: SystemMessage, session: Session):
+    def start_conversation(self, message: CustomMessage, system_message: str, session: Session):
         # Check if conversation already exists in the database
         conversation = self.get_conversation(message.conversation_id, session)
         if not conversation: 
@@ -53,14 +60,32 @@ class DatabaseManager(metaclass=DatabaseManagerMeta):
             session.commit()
             session.refresh(conversation)
             # Store system message in database
-            sys_msg = Message(conversation_id=message.conversation_id, content=system_message.content, source="system")
+            sys_msg = Message(conversation_id=message.conversation_id, content=system_message, source="system")
+            self.save_message(sys_msg, session)
             session.add(sys_msg)
             session.commit()
 
         return conversation
+    
+    def save_message(self, message: Message, session: Session) -> None:
+        # Store system message in database
+        session.add(message)
+        session.commit()
 
-    def get_messages(self, conversation_id: str) -> list[Message]:
+    def get_messages(self, conversation_id: UUID, session: Session) -> list[LLMMessage]:
         # Fetch conversation messages from database
-        statement = select(Message).where(Conversation.id == UUID(conversation_id))
+        statement = select(Message.source, Message.content).where(Message.conversation_id == conversation_id)
         results = session.exec(statement)
-        return results
+
+        # Construct message list
+        messages_list = []
+        for source, content in results:
+            if source == 'user':
+                messages_list.append(UserMessage(content=content, source='user'))
+            elif source == 'assistant':
+                messages_list.append(AssistantMessage(content=content, source='assistant'))
+            elif source == 'tool_call':
+                messages_list.append(FunctionExecutionResultMessage(content=content))
+            elif source == 'system':
+                messages_list.append(SystemMessage(content=content))
+        return messages_list

@@ -21,8 +21,7 @@ from autogen_core.tools import Tool
 from src.tools.messages import CustomMessage
 from sqlmodel import Session
 from src.database.db import DatabaseManager
-
-sessions: Dict[str, List[LLMMessage]] = {}
+from src.database.models import Message
 
 class CalendarAssistantAgent(RoutedAgent):
     def __init__(self, model_client: ChatCompletionClient, tool_schema: List[Tool]) -> None:
@@ -52,29 +51,24 @@ class CalendarAssistantAgent(RoutedAgent):
     async def handle_user_message(self, message: CustomMessage, ctx: MessageContext) -> CustomMessage:
         database = DatabaseManager()
         with Session(database._engine) as session:
-            print(f"Conversation id: {message.conversation_id}")
-            # Store conversation data and system message in database if they do not already exist
-            conversation = database.start_conversation(message, self._system_messages[0], session)
-
-            # Save system message into database
-
-            # Create a session of messages.
-            if message.user_id not in sessions:
-                sessions[message.user_id] = []
-                sessions[message.user_id].append(self._system_messages[0]) # Append the system message
-
-            sessions[message.user_id].append(UserMessage(content=message.content, source="user"))
+            # Store conversation data and system message in the database if they do not already exist
+            conversation = database.start_conversation(message, self._system_messages[0].content, session)
+            # Store user message in the database
+            database.save_message(Message(conversation_id=message.conversation_id, content=message.content, source="user"), session);
 
             while True:
+                # Get messages from the database to give llm context
+                messages = database.get_messages(message.conversation_id, session)
+
                 # Run the chat completion with the tools.
                 llm_result = await self._model_client.create(
-                    messages=sessions[message.user_id],
+                    messages=messages,
                     tools=self._tools,
                     cancellation_token=ctx.cancellation_token,
                 )
 
-                # Add the first model create result to the session.
-                sessions[message.user_id].append(AssistantMessage(content=llm_result.content, source="assistant"))
+                # Add the llm's result to the database.
+                database.save_message(Message(conversation_id=message.conversation_id, content=llm_result.content, source="assistant"), session);
 
                 print(f"{'-'*80}\n{self.id.type}:\n{llm_result.content}", flush=True)
                 # If there are no tool calls, return the result.
@@ -90,8 +84,8 @@ class CalendarAssistantAgent(RoutedAgent):
                 )
                 print(f"{'-'*80}\n{self.id.type}:\n{tool_call_results}", flush=True)
 
-                # Add the function execution results to the session.
-                sessions[message.user_id].append(FunctionExecutionResultMessage(content=tool_call_results))    
+                # Add the function execution results to the database.
+                database.save_message(Message(conversation_id=message.conversation_id, content=tool_call_results, source="tool_call"), session);   
 
     async def _execute_tool_call(
         self, call: FunctionCall, cancellation_token: CancellationToken
