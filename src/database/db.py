@@ -8,9 +8,10 @@ from autogen_core.models import (
     AssistantMessage,
     FunctionExecutionResultMessage,
 )
-from uuid import UUID
+from uuid import UUID   
 
-DATABASE_URL = "sqlite:///db.sqlite"
+# TODO: make this url an environment variable 
+DATABASE_URL = "sqlite:///src/database/db.sqlite"
 
 class DatabaseManagerMeta(type):
     _instances = {}
@@ -28,12 +29,6 @@ class DatabaseManagerMeta(type):
 class DatabaseManager(metaclass=DatabaseManagerMeta):
     def __init__(self) -> None:
         self._engine = create_engine(DATABASE_URL, echo=True)
-
-    # def init_db(self, session: Session):
-    #     SQLModel.metadata.create_all(self._engine)
-    #     user = User(id=UUID('75794adebb7649c8b3b297a2a4a24362'), username='David', email='davidsalihu19@gmail.com')
-    #     session.add(user)
-    #     session.commit()
 
     def get_user(self, user_id: str) -> User:
         # Fetch User data from database
