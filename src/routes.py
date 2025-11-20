@@ -6,17 +6,13 @@ from src.database.models import User
 from sqlmodel import Session
 from typing import List
 from autogen_core.tools import Tool
-import uuid
-from src.config import Settings
-from autogen_ext.models.openai import OpenAIChatCompletionClient
 from src.agents.calendar_agent import CalendarAssistantAgent
 from src.tools.calendar_api_client import CalendarAPIClient
+from src.model_client import ModelClientManager
+import uuid
 
 # Create the model client.
-model_client = OpenAIChatCompletionClient(
-    model="gpt-4o-mini",
-    api_key=Settings.OPENAI_API_KEY,
-)
+model_client = ModelClientManager()
 
 # Create a runtime.
 runtime = SingleThreadedAgentRuntime()

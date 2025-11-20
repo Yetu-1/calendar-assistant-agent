@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from src.routes import router, runtime
 from contextlib import asynccontextmanager
-from autogen_ext.models.openai import OpenAIChatCompletionClient
 from src.database.models import User, Conversation, Message
+from src.model_client import ModelClientManager
+
+model_client = ModelClientManager();
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -31,7 +31,7 @@ class DatabaseManagerMeta(type):
 
 class DatabaseManager(metaclass=DatabaseManagerMeta):
     def __init__(self) -> None:
-        self._engine = create_engine(DATABASE_URL, echo=True)
+        self._engine = create_engine(DATABASE_URL, echo=False)
 
     def get_user(self, user_id: str) -> User:
         # Fetch User data from database
@@ -98,5 +98,4 @@ class DatabaseManager(metaclass=DatabaseManagerMeta):
                 messages_list.append(FunctionExecutionResultMessage(content=tool_call_results_obj))
             elif source == 'system':
                 messages_list.append(SystemMessage(content=content))
-        print(messages_list)
         return messages_list

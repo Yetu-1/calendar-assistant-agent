@@ -44,7 +44,7 @@ class CalendarAssistantAgent(RoutedAgent):
                 "Then ask the user for confirmation before updating it.\n"
             )
         ]
-        self._model_client = model_client
+        self._model_client = model_client._client
         self._tools = tool_schema
 
     @message_handler
