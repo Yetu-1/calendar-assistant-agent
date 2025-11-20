@@ -67,25 +67,46 @@ class CalendarAssistantAgent(RoutedAgent):
                     cancellation_token=ctx.cancellation_token,
                 )
 
-                # Add the llm's result to the database.
-                database.save_message(Message(conversation_id=message.conversation_id, content=llm_result.content, source="assistant"), session);
-
                 print(f"{'-'*80}\n{self.id.type}:\n{llm_result.content}", flush=True)
                 # If there are no tool calls, return the result.
                 if isinstance(llm_result.content, str):
+                    # Save the llm's result to the database.
+                    database.save_message(Message(conversation_id=message.conversation_id, content=llm_result.content, source="assistant_message"), session);
                     return CustomMessage(content=llm_result.content)
                 assert isinstance(llm_result.content, list) and all(
                     isinstance(call, FunctionCall) for call in llm_result.content
                 )
+                # Save Function call in the database
+                tool_call_request = json.dumps([ # Serialize tool call request to string
+                    {
+                        "name": call.name,
+                        "id": call.id,
+                        "arguments": call.arguments,
+                    }
+                    for call in llm_result.content
+                ])
+                database.save_message(Message(conversation_id=message.conversation_id, content=tool_call_request, source="tool_call_request"), session);
+
 
                 # Execute the tool calls.
                 tool_call_results = await asyncio.gather(
                     *[self._execute_tool_call(call, ctx.cancellation_token) for call in llm_result.content]
                 )
+                # Serialize tool call result to string
+                tool_call_results_serialized = json.dumps([
+                    {
+                        "name": call.name,
+                        "call_id": call.call_id,
+                        "content": call.content,
+                        "is_error": call.is_error,
+                    }
+                    for call in tool_call_results
+                ])
+
                 print(f"{'-'*80}\n{self.id.type}:\n{tool_call_results}", flush=True)
 
-                # Add the function execution results to the database.
-                database.save_message(Message(conversation_id=message.conversation_id, content=tool_call_results, source="tool_call"), session);   
+                # Save the function execution results in the database.
+                database.save_message(Message(conversation_id=message.conversation_id, content=tool_call_results_serialized, source="tool_call_result"), session);   
 
     async def _execute_tool_call(
         self, call: FunctionCall, cancellation_token: CancellationToken
