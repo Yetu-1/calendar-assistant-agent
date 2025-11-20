@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from src.routes import router, runtime
 from contextlib import asynccontextmanager
-from src.config import settings
+from src.config import SETTINGS
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from src.agents.calendar_agent import CalendarAssistantAgent
 from src.tools.calendar_agent_tools import calendar_agent_tools
@@ -9,7 +9,7 @@ from src.tools.calendar_agent_tools import calendar_agent_tools
 # Create the model client.
 model_client = OpenAIChatCompletionClient(
     model="gpt-4o-mini",
-    api_key=settings.openai_api_key,
+    api_key=SETTINGS.openai_api_key,
 )
 
 @asynccontextmanager
