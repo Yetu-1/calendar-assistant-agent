@@ -71,7 +71,7 @@ class CalendarAPIClient:
         ).execute()
         return f"Result: {result}"
     
-    def get_tools(self) -> list[Tool]:
+    def get_tools(self) -> List[Tool]:
         tools = [
             FunctionTool(self.get_date_and_time, description="Use this tool to fetch current date and time."),
             FunctionTool(self.add_event_to_calendar, description="Use to add event to calendar."),
