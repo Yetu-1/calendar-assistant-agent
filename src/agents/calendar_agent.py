@@ -90,6 +90,9 @@ class CalendarAssistantAgent(RoutedAgent):
     ) -> FunctionExecutionResult:
         # Find the tool by name.
         tool = next((tool for tool in self._tools if tool.name == call.name), None)
+        # Check if tool is none 
+        if tool is None:
+            raise ValueError(f"Unknown tool: {call.name}")
 
         # Run the tool and capture the result.
         try:
