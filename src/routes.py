@@ -5,9 +5,11 @@ from src.database.db import DatabaseManager
 from src.database.models import User
 from sqlmodel import Session
 import uuid
+from src.runtime import RuntimeManager
 
 # Create a runtime.
-runtime = SingleThreadedAgentRuntime()
+runtime = RuntimeManager();
+
 calendar_assistant_agent = AgentId("calendar_assistant_agent", "default") # define calendar agent ID
 
 # Websockets connection manager
