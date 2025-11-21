@@ -3,8 +3,10 @@ from src.routes import router, runtime
 from contextlib import asynccontextmanager
 from src.database.models import User, Conversation, Message
 from src.model_client import ModelClientManager
+from src.runtime import RuntimeManager
 
 model_client = ModelClientManager();
+runtime = RuntimeManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

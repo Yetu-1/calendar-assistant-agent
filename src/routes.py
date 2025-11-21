@@ -10,12 +10,14 @@ from src.agents.calendar_agent import CalendarAssistantAgent
 from src.tools.calendar_api_client import CalendarAPIClient
 from src.model_client import ModelClientManager
 import uuid
+from src.runtime import RuntimeManager
 
 # Create the model client.
 model_client = ModelClientManager()
 
 # Create a runtime.
-runtime = SingleThreadedAgentRuntime()
+runtime = RuntimeManager();
+
 calendar_assistant_agent = AgentId("calendar_assistant_agent", "default") # define calendar agent ID
 
 # Websockets connection manager

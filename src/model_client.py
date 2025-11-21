@@ -1,5 +1,5 @@
 from autogen_ext.models.openai import OpenAIChatCompletionClient
-from src.config import Settings
+from src.config import SETTINGS
 
 class ModelClientManagerMeta(type):
     _instances = {}
@@ -19,7 +19,7 @@ class ModelClientManager(metaclass=ModelClientManagerMeta):
         # Create the model client.
         self._client = OpenAIChatCompletionClient(
             model="gpt-4o-mini",
-            api_key=Settings.OPENAI_API_KEY,
+            api_key=SETTINGS.openai_api_key,
         )
     async def close(self) -> None:
         await self._client.close()

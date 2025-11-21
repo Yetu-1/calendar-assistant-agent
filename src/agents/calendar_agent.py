@@ -73,47 +73,49 @@ class CalendarAssistantAgent(RoutedAgent):
                     # Save the llm's result to the database.
                     database.save_message(Message(conversation_id=message.conversation_id, content=llm_result.content, source="assistant_message"), session);
                     return CustomMessage(content=llm_result.content)
-                assert isinstance(llm_result.content, list) and all(
-                    isinstance(call, FunctionCall) for call in llm_result.content
-                )
-                # Save Function call in the database
-                tool_call_request = json.dumps([ # Serialize tool call request to string
-                    {
-                        "name": call.name,
-                        "id": call.id,
-                        "arguments": call.arguments,
-                    }
-                    for call in llm_result.content
-                ])
-                database.save_message(Message(conversation_id=message.conversation_id, content=tool_call_request, source="tool_call_request"), session);
+                try:
+                    # Save Function call in the database
+                    tool_call_request = json.dumps([ # Serialize tool call request to string
+                        {
+                            "name": call.name,
+                            "id": call.id,
+                            "arguments": call.arguments,
+                        }
+                        for call in llm_result.content
+                    ])
+                    database.save_message(Message(conversation_id=message.conversation_id, content=tool_call_request, source="tool_call_request"), session)
 
 
-                # Execute the tool calls.
-                tool_call_results = await asyncio.gather(
-                    *[self._execute_tool_call(call, ctx.cancellation_token) for call in llm_result.content]
-                )
-                # Serialize tool call result to string
-                tool_call_results_serialized = json.dumps([
-                    {
-                        "name": call.name,
-                        "call_id": call.call_id,
-                        "content": call.content,
-                        "is_error": call.is_error,
-                    }
-                    for call in tool_call_results
-                ])
+                    # Execute the tool calls.
+                    tool_call_results = await asyncio.gather(
+                        *[self._execute_tool_call(call, ctx.cancellation_token) for call in llm_result.content]
+                    )
+                    # Serialize tool call result to string
+                    tool_call_results_serialized = json.dumps([
+                        {
+                            "name": call.name,
+                            "call_id": call.call_id,
+                            "content": call.content,
+                            "is_error": call.is_error,
+                        }
+                        for call in tool_call_results
+                    ])
 
-                print(f"{'-'*80}\n{self.id.type}:\n{tool_call_results}", flush=True)
+                    print(f"{'-'*80}\n{self.id.type}:\n{tool_call_results}", flush=True)
 
-                # Save the function execution results in the database.
-                database.save_message(Message(conversation_id=message.conversation_id, content=tool_call_results_serialized, source="tool_call_result"), session);   
+                    # Save the function execution results in the database.
+                    database.save_message(Message(conversation_id=message.conversation_id, content=tool_call_results_serialized, source="tool_call_result"), session)  
+                except Exception as e:
+                    return Message(content=str(e))   
 
     async def _execute_tool_call(
         self, call: FunctionCall, cancellation_token: CancellationToken
     ) -> FunctionExecutionResult:
         # Find the tool by name.
         tool = next((tool for tool in self._tools if tool.name == call.name), None)
-        assert tool is not None
+        # Check if tool is none 
+        if tool is None:
+            return FunctionExecutionResult(call_id=call.id, content="Unknown tool", is_error=True, name=call.name)
 
         # Run the tool and capture the result.
         try:
