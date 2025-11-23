@@ -1,0 +1,77 @@
+from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect, Depends
+from autogen_core import AgentId, SingleThreadedAgentRuntime
+from src.tools.messages import CustomMessage
+from src.database.db import DatabaseManager
+from src.database.models import User
+from sqlmodel import Session
+from typing import List
+from autogen_core.tools import Tool
+from src.agents.calendar_agent import CalendarAssistantAgent
+from src.tools.calendar_api_client import CalendarAPIClient
+from src.model_client import ModelClientManager
+import uuid
+from src.runtime import RuntimeManager
+
+# Create the model client.
+model_client = ModelClientManager()
+
+# Create a runtime.
+runtime = RuntimeManager();
+
+calendar_assistant_agent = AgentId("calendar_assistant_agent", "default") # define calendar agent ID
+
+# Websockets connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def send_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+manager = ConnectionManager()
+
+router = APIRouter()
+
+@router.get("/")
+async def root():
+    return {"message": "Server Running"}
+
+@router.websocket("/ws/{user_id}")
+async def websocket_endpoint( websocket: WebSocket, user_id: str):
+    database = DatabaseManager()
+    # Fetch User data from database
+    user = database.get_user(user_id)
+
+    calendar_api_client = CalendarAPIClient(user)
+    
+    calendar_agent = CalendarAssistantAgent(
+        model_client=model_client,
+        tool_schema=calendar_api_client.get_tools(),
+    )
+
+    # Create new conversation id
+    conversation_id = uuid.uuid4();
+
+    agent_id = AgentId(type="calendar_agent", key=f"calendar-agent-{user.id}-{conversation_id}")
+    # Register the calendar assistant agent
+    await runtime.register_agent_instance(calendar_agent, agent_id)
+
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Receive message from websocket
+            message =  CustomMessage(user_id=user.id, conversation_id=conversation_id, content=await websocket.receive_text())
+            # Send the message to the calendar assistant agent
+            response = await runtime.send_message(message, agent_id)
+            await manager.send_message(f"Assistant: {response.content}", websocket)
+    except WebSocketDisconnect:
+        # TODO: Delete conversation from database
+        # Disconnect websocket
+        manager.disconnect(websocket)
