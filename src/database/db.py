@@ -7,8 +7,11 @@ from autogen_core.models import (
     UserMessage,
     AssistantMessage,
     FunctionExecutionResultMessage,
+    FunctionExecutionResult,
 )
+from autogen_core import FunctionCall
 from uuid import UUID   
+import json
 
 # TODO: make this url an environment variable 
 DATABASE_URL = "sqlite:///src/database/db.sqlite"
@@ -28,7 +31,7 @@ class DatabaseManagerMeta(type):
 
 class DatabaseManager(metaclass=DatabaseManagerMeta):
     def __init__(self) -> None:
-        self._engine = create_engine(DATABASE_URL, echo=True)
+        self._engine = create_engine(DATABASE_URL, echo=False)
 
     def get_user(self, user_id: str) -> User:
         # Fetch User data from database
@@ -78,9 +81,21 @@ class DatabaseManager(metaclass=DatabaseManagerMeta):
             if source == 'user':
                 messages_list.append(UserMessage(content=content, source='user'))
             elif source == 'assistant':
-                messages_list.append(AssistantMessage(content=content, source='assistant'))
-            elif source == 'tool_call':
-                messages_list.append(FunctionExecutionResultMessage(content=content))
+                messages_list.append(AssistantMessage(content=content, source='assistant_message'))
+            elif source == 'tool_call_request':
+                # Deserialize string back to list of python dictionaries 
+                tool_call_request_dict = json.loads(content)
+                tool_call_request_obj = [
+                    FunctionCall(id=call["id"], arguments=call["arguments"], name=call["name"]) for call in tool_call_request_dict
+                ]
+                messages_list.append(AssistantMessage(content=tool_call_request_obj, source='assistant_message'))    
+            elif source == 'tool_call_result':
+                # Deserialize string back to list of python dictionaries 
+                tool_call_results_dict = json.loads(content)
+                tool_call_results_obj = [
+                    FunctionExecutionResult(call_id=call["call_id"], content=call["content"], is_error=call["is_error"], name=call["name"]) for call in tool_call_results_dict
+                ]
+                messages_list.append(FunctionExecutionResultMessage(content=tool_call_results_obj))
             elif source == 'system':
                 messages_list.append(SystemMessage(content=content))
         return messages_list

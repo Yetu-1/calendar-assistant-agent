@@ -4,8 +4,16 @@ from src.tools.messages import CustomMessage
 from src.database.db import DatabaseManager
 from src.database.models import User
 from sqlmodel import Session
+from typing import List
+from autogen_core.tools import Tool
+from src.agents.calendar_agent import CalendarAssistantAgent
+from src.tools.calendar_api_client import CalendarAPIClient
+from src.model_client import ModelClientManager
 import uuid
 from src.runtime import RuntimeManager
+
+# Create the model client.
+model_client = ModelClientManager()
 
 # Create a runtime.
 runtime = RuntimeManager();
@@ -40,10 +48,20 @@ async def websocket_endpoint( websocket: WebSocket, user_id: str):
     database = DatabaseManager()
     # Fetch User data from database
     user = database.get_user(user_id)
-    print(f"user: {user}")
+
+    calendar_api_client = CalendarAPIClient(user)
     
+    calendar_agent = CalendarAssistantAgent(
+        model_client=model_client,
+        tool_schema=calendar_api_client.get_tools(),
+    )
+
     # Create new conversation id
     conversation_id = uuid.uuid4();
+
+    agent_id = AgentId(type="calendar_agent", key=f"calendar-agent-{user.id}-{conversation_id}")
+    # Register the calendar assistant agent
+    await runtime.register_agent_instance(calendar_agent, agent_id)
 
     await manager.connect(websocket)
     try:
@@ -51,7 +69,7 @@ async def websocket_endpoint( websocket: WebSocket, user_id: str):
             # Receive message from websocket
             message =  CustomMessage(user_id=user.id, conversation_id=conversation_id, content=await websocket.receive_text())
             # Send the message to the calendar assistant agent
-            response = await runtime.send_message(message, calendar_assistant_agent)
+            response = await runtime.send_message(message, agent_id)
             await manager.send_message(f"Assistant: {response.content}", websocket)
     except WebSocketDisconnect:
         # TODO: Delete conversation from database

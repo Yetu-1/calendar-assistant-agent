@@ -1,11 +1,18 @@
 from typing import List
 from pydantic import BaseModel, Field
+import uuid
 from uuid import UUID
 
 class CustomMessage(BaseModel):
     user_id: UUID | None = Field(None, description="Id of the user")
     conversation_id: UUID | None = Field(None, description="Id of the coversation")
     content: str
+
+class UserData(BaseModel):
+    id: uuid.UUID
+    username: str
+    email: str
+    token: str | None
 
 class EventDateTime(BaseModel):
     dateTime: str = Field(..., description="Event datetime string in ISO 8601 format")

@@ -1,5 +1,6 @@
 from autogen_core import AgentId, SingleThreadedAgentRuntime
 from src.tools.messages import CustomMessage
+from src.agents.calendar_agent import CalendarAssistantAgent
 
 class RuntimeManagerMeta(type):
     _instances = {}
@@ -26,4 +27,7 @@ class RuntimeManager(metaclass=RuntimeManagerMeta):
 
     async def send_message(self, message: CustomMessage, agent_id: AgentId) -> CustomMessage:
         response = await self._runtime.send_message(message, agent_id)
+        return response
+    async def register_agent_instance(self, calendar_agent: CalendarAssistantAgent, agent_id: AgentId):
+        response = await self._runtime.register_agent_instance(calendar_agent, agent_id)
         return response
