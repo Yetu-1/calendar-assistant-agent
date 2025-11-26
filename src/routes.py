@@ -1,7 +1,7 @@
 from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect, Depends
 from autogen_core import AgentId, SingleThreadedAgentRuntime
 from src.tools.messages import CustomMessage
-from src.database.db import DatabaseManager
+from src.database.repository import UserRepository
 from src.database.models import User
 from sqlmodel import Session
 from typing import List
@@ -45,9 +45,9 @@ async def root():
 
 @router.websocket("/ws/{user_id}")
 async def websocket_endpoint( websocket: WebSocket, user_id: str):
-    database = DatabaseManager()
+    users = UserRepository()
     # Fetch User data from database
-    user = database.get_user(user_id)
+    user = users.get(user_id)
 
     calendar_api_client = CalendarAPIClient(user)
     
