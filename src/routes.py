@@ -12,9 +12,6 @@ from src.model_client import ModelClientManager
 import uuid
 from src.runtime import RuntimeManager
 
-# Create the model client.
-model_client = ModelClientManager()
-
 # Create a runtime.
 runtime = RuntimeManager();
 
@@ -52,7 +49,7 @@ async def websocket_endpoint( websocket: WebSocket, user_id: str):
     calendar_api_client = CalendarAPIClient(user)
     
     calendar_agent = CalendarAssistantAgent(
-        model_client=model_client,
+        model_client=ModelClientManager(),
         tool_schema=calendar_api_client.get_tools(),
     )
 
