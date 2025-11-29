@@ -8,9 +8,10 @@ from typing import List
 from autogen_core.tools import Tool
 from src.agents.calendar_agent import CalendarAssistantAgent
 from src.tools.calendar_api_client import CalendarAPIClient
-from src.model_client import ModelClientManager
 import uuid
 from src.runtime import RuntimeManager
+from autogen_ext.models.openai import OpenAIChatCompletionClient
+from src.config import SETTINGS
 
 # Create a runtime.
 runtime = RuntimeManager();
@@ -49,7 +50,10 @@ async def websocket_endpoint( websocket: WebSocket, user_id: str):
     calendar_api_client = CalendarAPIClient(user)
     
     calendar_agent = CalendarAssistantAgent(
-        model_client=ModelClientManager(),
+        model_client=OpenAIChatCompletionClient(
+            model="gpt-4o-mini",
+            api_key=SETTINGS.openai_api_key,
+        ),
         tool_schema=calendar_api_client.get_tools(),
     )
 
