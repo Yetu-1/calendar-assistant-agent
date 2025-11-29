@@ -19,9 +19,8 @@ from autogen_core.models import (
 )
 from autogen_core.tools import Tool
 from src.tools.messages import CustomMessage
-from sqlmodel import Session
-from src.database.db import DatabaseManager
-from src.database.models import Message
+from src.database.models import Message, Conversation
+from src.database.repository import UserRepository, ConversationRepository, MessageRepository
 
 class CalendarAssistantAgent(RoutedAgent):
     def __init__(self, model_client: ChatCompletionClient, tool_schema: List[Tool]) -> None:
@@ -44,69 +43,75 @@ class CalendarAssistantAgent(RoutedAgent):
                 "Then ask the user for confirmation before updating it.\n"
             )
         ]
-        self._model_client = model_client._client
+        self._model_client = model_client
         self._tools = tool_schema
+        self._conversations = ConversationRepository()
+        self._messages = MessageRepository()
+        self._users = UserRepository() 
 
     @message_handler
     async def handle_user_message(self, message: CustomMessage, ctx: MessageContext) -> CustomMessage:
-        database = DatabaseManager()
-        with Session(database._engine) as session:
-            # Store conversation data and system message in the database if they do not already exist
-            conversation = database.start_conversation(message, self._system_messages[0].content, session)
-            # Store user message in the database
-            database.save_message(Message(conversation_id=message.conversation_id, content=message.content, source="user"), session);
+        # Check if conversation already exists in the database
+        conversation = self._conversations.get(message.conversation_id)
+        if not conversation: 
+            # Store conversation data in the database
+            self._conversations.create(Conversation(id=message.conversation_id, user_id=message.user_id))
+            # Store system message in database
+            self._messages.create(Message(conversation_id=message.conversation_id, content=self._system_messages[0].content, source="system"))
 
-            while True:
-                # Get messages from the database to give llm context
-                messages = database.get_messages(message.conversation_id, session)
+        # Store user message in the database
+        self._messages.create(Message(conversation_id=message.conversation_id, content=message.content, source="user"))
 
-                # Run the chat completion with the tools.
-                llm_result = await self._model_client.create(
-                    messages=messages,
-                    tools=self._tools,
-                    cancellation_token=ctx.cancellation_token,
+        while True:
+            # Get messages from the database to give llm context
+            messages = self._messages.get_all(message.conversation_id,)
+            # Run the chat completion with the tools.
+            llm_result = await self._model_client.create(
+                messages=messages,
+                tools=self._tools,
+                cancellation_token=ctx.cancellation_token,
+            )
+
+            print(f"{'-'*80}\n{self.id.type}:\n{llm_result.content}", flush=True)
+            # If there are no tool calls, return the result.
+            if isinstance(llm_result.content, str):
+                # Save the llm's result to the database.
+                self._messages.create(Message(conversation_id=message.conversation_id, content=llm_result.content, source="assistant_message"))
+                return CustomMessage(content=llm_result.content)
+            try:
+                # Save Function call in the database
+                tool_call_request = json.dumps([ # Serialize tool call request to string
+                    {
+                        "name": call.name,
+                        "id": call.id,
+                        "arguments": call.arguments,
+                    }
+                    for call in llm_result.content
+                ])
+                # Save tool call request message in the database
+                self._messages.create(Message(conversation_id=message.conversation_id, content=tool_call_request, source="tool_call_request"))
+
+                # Execute the tool calls.
+                tool_call_results = await asyncio.gather(
+                    *[self._execute_tool_call(call, ctx.cancellation_token) for call in llm_result.content]
                 )
+                # Serialize tool call result to string
+                tool_call_results_serialized = json.dumps([
+                    {
+                        "name": call.name,
+                        "call_id": call.call_id,
+                        "content": call.content,
+                        "is_error": call.is_error,
+                    }
+                    for call in tool_call_results
+                ])
 
-                print(f"{'-'*80}\n{self.id.type}:\n{llm_result.content}", flush=True)
-                # If there are no tool calls, return the result.
-                if isinstance(llm_result.content, str):
-                    # Save the llm's result to the database.
-                    database.save_message(Message(conversation_id=message.conversation_id, content=llm_result.content, source="assistant_message"), session);
-                    return CustomMessage(content=llm_result.content)
-                try:
-                    # Save Function call in the database
-                    tool_call_request = json.dumps([ # Serialize tool call request to string
-                        {
-                            "name": call.name,
-                            "id": call.id,
-                            "arguments": call.arguments,
-                        }
-                        for call in llm_result.content
-                    ])
-                    database.save_message(Message(conversation_id=message.conversation_id, content=tool_call_request, source="tool_call_request"), session)
+                print(f"{'-'*80}\n{self.id.type}:\n{tool_call_results}", flush=True)
 
-
-                    # Execute the tool calls.
-                    tool_call_results = await asyncio.gather(
-                        *[self._execute_tool_call(call, ctx.cancellation_token) for call in llm_result.content]
-                    )
-                    # Serialize tool call result to string
-                    tool_call_results_serialized = json.dumps([
-                        {
-                            "name": call.name,
-                            "call_id": call.call_id,
-                            "content": call.content,
-                            "is_error": call.is_error,
-                        }
-                        for call in tool_call_results
-                    ])
-
-                    print(f"{'-'*80}\n{self.id.type}:\n{tool_call_results}", flush=True)
-
-                    # Save the function execution results in the database.
-                    database.save_message(Message(conversation_id=message.conversation_id, content=tool_call_results_serialized, source="tool_call_result"), session)  
-                except Exception as e:
-                    return Message(content=str(e))   
+                # Save the function execution results in the database.
+                self._messages.create(Message(conversation_id=message.conversation_id, content=tool_call_results_serialized, source="tool_call_result"))
+            except Exception as e:
+                return Message(content=str(e))   
 
     async def _execute_tool_call(
         self, call: FunctionCall, cancellation_token: CancellationToken
