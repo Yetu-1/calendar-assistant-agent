@@ -1,19 +1,17 @@
 from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect, Depends
 from autogen_core import AgentId, SingleThreadedAgentRuntime
 from src.tools.messages import CustomMessage
-from src.database.db import DatabaseManager
+from src.database.repository import UserRepository
 from src.database.models import User
 from sqlmodel import Session
 from typing import List
 from autogen_core.tools import Tool
 from src.agents.calendar_agent import CalendarAssistantAgent
 from src.tools.calendar_api_client import CalendarAPIClient
-from src.model_client import ModelClientManager
 import uuid
 from src.runtime import RuntimeManager
-
-# Create the model client.
-model_client = ModelClientManager()
+from autogen_ext.models.openai import OpenAIChatCompletionClient
+from src.config import SETTINGS
 
 # Create a runtime.
 runtime = RuntimeManager();
@@ -45,14 +43,17 @@ async def root():
 
 @router.websocket("/ws/{user_id}")
 async def websocket_endpoint( websocket: WebSocket, user_id: str):
-    database = DatabaseManager()
+    users = UserRepository()
     # Fetch User data from database
-    user = database.get_user(user_id)
+    user = users.get(user_id)
 
     calendar_api_client = CalendarAPIClient(user)
     
     calendar_agent = CalendarAssistantAgent(
-        model_client=model_client,
+        model_client=OpenAIChatCompletionClient(
+            model="gpt-4o-mini",
+            api_key=SETTINGS.openai_api_key,
+        ),
         tool_schema=calendar_api_client.get_tools(),
     )
 
