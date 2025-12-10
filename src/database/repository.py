@@ -26,6 +26,12 @@ class UserRepository:
         user = self.database.get(statement)
         return user
 
+    def get_user_by_email(self, email: str) -> User:
+        # Fetch User data from database
+        statement = select(User).where(User.email == email)
+        user = self.database.get(statement)
+        return user
+
     def delete(self, id: str):
         statement = select(User).where(User.id == UUID(id))
         self.database.delete(statement)

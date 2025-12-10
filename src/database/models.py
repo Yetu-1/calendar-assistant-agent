@@ -6,6 +6,7 @@ class User(SQLModel, table=True):
     username: str
     email: str
     token: str | None
+    password: str
 
 class MessageBase(SQLModel):
     conversation_id: uuid.UUID = Field(foreign_key="conversation.id")
