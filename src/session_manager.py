@@ -10,7 +10,9 @@ from autogen_core.models import (
     FunctionExecutionResultMessage,
     FunctionExecutionResult,
 )
+from autogen_core import FunctionCall
 from sqlmodel import select
+import json
 
 class SessionManagerMeta(type):
     _instances = {}
