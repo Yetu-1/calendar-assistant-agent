@@ -5,7 +5,7 @@ from uuid import UUID
 
 class CustomMessage(BaseModel):
     user_id: UUID | None = Field(None, description="Id of the user")
-    conversation_id: UUID | None = Field(None, description="Id of the coversation")
+    session_id: UUID | None = Field(None, description="Id of the session")
     content: str
 
 class UserData(BaseModel):
