@@ -13,7 +13,7 @@ import tzlocal
 service_account_file_path = Path(__file__).parent / "service_account.json"
 
 class CalendarAPIClient: 
-    def __init__(self, user_data: UserData):
+    def __init__(self, user_data: UserData=None):
         # TODO: use user data to build api client using token after oauth flow has been setup(for now use service account)
 
         # Initialize the Google Calendar API client with service account credentials

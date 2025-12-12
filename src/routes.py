@@ -1,5 +1,4 @@
 from fastapi import APIRouter, FastAPI, WebSocket, WebSocketDisconnect, Depends, Query, WebSocketException, status
-from autogen_core import AgentId, SingleThreadedAgentRuntime
 from src.tools.messages import CustomMessage
 from src.database.repository import UserRepository
 from src.database.models import User
@@ -10,8 +9,7 @@ from src.agents.calendar_agent import CalendarAssistantAgent
 from src.tools.calendar_api_client import CalendarAPIClient
 import uuid
 from src.runtime import RuntimeManager
-from autogen_ext.models.openai import OpenAIChatCompletionClient
-from src.config import SETTINGS
+from autogen_core import AgentId
 import jwt
 from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
@@ -21,8 +19,6 @@ from src.auth import create_new_user, authenticate_user, validate_token
 runtime = RuntimeManager();
 
 password_hash = PasswordHash.recommended()
-
-calendar_assistant_agent = AgentId("calendar_assistant_agent", "default") # define calendar agent ID
 
 # Websockets connection manager
 class ConnectionManager:
@@ -49,7 +45,7 @@ async def root():
 
 @router.post("/login")
 async def login( email: str, password: str):
-    token = authenticate_user(email, password)
+    token = await authenticate_user(email, password)
     return {"jwt": token}
 
 
@@ -69,33 +65,17 @@ async def get_token(
 @router.websocket("/ws/")
 async def websocket_endpoint( websocket: WebSocket):
     token = websocket.query_params.get("token")
-    user_id = validate_token(token)
+    user_id, session_id = validate_token(token)
     users = UserRepository()
     # Fetch User data from database
     user = users.get(user_id)
-
-    calendar_api_client = CalendarAPIClient(user)
-    
-    calendar_agent = CalendarAssistantAgent(
-        model_client=OpenAIChatCompletionClient(
-            model="gpt-4o-mini",
-            api_key=SETTINGS.openai_api_key,
-        ),
-        tool_schema=calendar_api_client.get_tools(),
-    )
-
-    # Create new conversation id
-    conversation_id = uuid.uuid4();
-
-    agent_id = AgentId(type="calendar_agent", key=f"calendar-agent-{user.id}-{conversation_id}")
-    # Register the calendar assistant agent
-    await runtime.register_agent_instance(calendar_agent, agent_id)
-
+    agent_id = AgentId(type="calendar_agent", key=f"calendar-agent-{user.id}-{session_id}")
     await manager.connect(websocket)
+
     try:
         while True:
             # Receive message from websocket
-            message =  CustomMessage(user_id=user.id, conversation_id=conversation_id, content=await websocket.receive_text())
+            message =  CustomMessage(user_id=user.id, session_id=session_id, content=await websocket.receive_text())
             # Send the message to the calendar assistant agent
             response = await runtime.send_message(message, agent_id)
             await manager.send_message(f"Assistant: {response.content}", websocket)
@@ -103,6 +83,3 @@ async def websocket_endpoint( websocket: WebSocket):
         # TODO: Delete conversation from database
         # Disconnect websocket
         manager.disconnect(websocket)
-
-
-# auth.py

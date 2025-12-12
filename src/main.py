@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from src.routes import router, runtime
 from contextlib import asynccontextmanager
-from src.database.models import User, Conversation, Message
 from src.runtime import RuntimeManager
 
 runtime = RuntimeManager()

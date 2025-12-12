@@ -22,10 +22,12 @@ class Database(metaclass=DatabaseMeta):
     def __init__(self) -> None:
         self._engine = create_engine(DATABASE_URL, echo=False)
     
-    def create(self, data: Any):
+    def create(self, data: Any) -> Any:
         with Session(self._engine) as session:
             session.add(data)
             session.commit()
+            session.refresh(data)
+            return data
 
     def get(self, statement: Select) -> Any:
         with Session(self._engine) as session:

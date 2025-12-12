@@ -1,5 +1,5 @@
 from sqlmodel import select
-from src.database.models import User, Conversation, Message
+from src.database.models import User, Message
 from autogen_core.models import (
     LLMMessage,
     SystemMessage,
@@ -34,24 +34,6 @@ class UserRepository:
 
     def delete(self, id: str):
         statement = select(User).where(User.id == UUID(id))
-        self.database.delete(statement)
-   
-
-class ConversationRepository:
-    def __init__(self):
-        self.database = Database()
-
-    def create(self, conversation: Conversation) -> str:
-        self.database.create(conversation)
-
-    def get(self, id: UUID) -> Conversation:
-        # Fetch conversation data from database
-        statement = select(Conversation).where(Conversation.id == id)
-        user = self.database.get(statement)
-        return user
-
-    def delete(self, id: UUID):
-        statement = select(Conversation).where(Conversation.id == id)
         self.database.delete(statement)
 
 class MessageRepository:
