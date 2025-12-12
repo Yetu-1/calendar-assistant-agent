@@ -208,3 +208,5 @@ __marimo__/
 
 #Secrets
 **/service_account.json
+
+/src/database/db.sqlite
